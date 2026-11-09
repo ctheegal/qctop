@@ -69,7 +69,7 @@ static float read_psi_memory(void)
     FILE *fp = fopen("/proc/pressure/memory", "r");
     if (!fp) return 0.0f;
     float avg10 = 0.0f;
-    fscanf(fp, "some avg10=%f", &avg10);
+    if (fscanf(fp, "some avg10=%f", &avg10) != 1) avg10 = 0.0f;
     fclose(fp);
     return avg10;
 }
@@ -137,12 +137,18 @@ static unsigned long read_kgsl_kb(void)
             char *path;
             if (asprintf(&path, "/sys/class/kgsl/kgsl/proc/%s/gpumem_mapped", ent->d_name) >= 0) {
                 FILE *f = fopen(path, "r");
-                if (f) { (void)fscanf(f, "%llu", &mapped); fclose(f); }
+                if (f) {
+                    if (fscanf(f, "%llu", &mapped) != 1) mapped = 0;
+                    fclose(f);
+                }
                 free(path);
             }
             if (asprintf(&path, "/sys/class/kgsl/kgsl/proc/%s/gpumem_unmapped", ent->d_name) >= 0) {
                 FILE *f = fopen(path, "r");
-                if (f) { (void)fscanf(f, "%llu", &unmapped); fclose(f); }
+                if (f) {
+                    if (fscanf(f, "%llu", &unmapped) != 1) unmapped = 0;
+                    fclose(f);
+                }
                 free(path);
             }
             proc_total += mapped + unmapped;
@@ -193,16 +199,19 @@ static float read_zone_max_temp(const char *prefix)
     while ((ent = readdir(dir)) != NULL) {
         if (strncmp(ent->d_name, "thermal_zone", 12) != 0) continue;
         char path[96];
-        snprintf(path, sizeof(path), "/sys/class/thermal/%s/type", ent->d_name);
+        if (snprintf(path, sizeof(path), "/sys/class/thermal/%s/type", ent->d_name) >= (int)sizeof(path)) continue;
         FILE *fp = fopen(path, "r");
         if (!fp) continue;
         char type[32] = {0};
-        (void)fgets(type, sizeof(type), fp); fclose(fp);
+        if (!fgets(type, sizeof(type), fp)) { fclose(fp); continue; }
+        fclose(fp);
         if (strncmp(type, prefix, strlen(prefix)) != 0) continue;
-        snprintf(path, sizeof(path), "/sys/class/thermal/%s/temp", ent->d_name);
+        if (snprintf(path, sizeof(path), "/sys/class/thermal/%s/temp", ent->d_name) >= (int)sizeof(path)) continue;
         fp = fopen(path, "r");
         if (!fp) continue;
-        int raw = 0; (void)fscanf(fp, "%d", &raw); fclose(fp);
+        int raw = 0;
+        if (fscanf(fp, "%d", &raw) != 1) { fclose(fp); continue; }
+        fclose(fp);
         float t = raw / 1000.0f;
         if (t > max_t) max_t = t;
     }

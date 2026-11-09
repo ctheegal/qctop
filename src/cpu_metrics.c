@@ -232,12 +232,14 @@ static float read_cpu_temp(void)
         FILE *fp = fopen(tp, "r"); free(tp);
         if (!fp) continue;
         char type[48] = {0};
-        (void)fgets(type, sizeof(type), fp); fclose(fp);
+        if (!fgets(type, sizeof(type), fp)) { fclose(fp); continue; }
+        fclose(fp);
         if (strncmp(type, "cpuss", 5)) continue;
         if (asprintf(&tp, "/sys/class/thermal/%s/temp", ent->d_name) < 0) continue;
         fp = fopen(tp, "r"); free(tp);
         if (!fp) continue;
-        int raw = 0; (void)fscanf(fp, "%d", &raw); fclose(fp);
+        int raw = 0; if (fscanf(fp, "%d", &raw) != 1) { fclose(fp); continue; }
+        fclose(fp);
         float t = raw / 1000.0f;
         if (t > max_t) max_t = t;
     }
@@ -279,7 +281,7 @@ void cpu_snapshot_end(const cpu_snap_t *prev, cpu_metrics_t *m)
                  cl->policy_id);
         FILE *fp = fopen(path, "r");
         unsigned long freq_khz = 0;
-        if (fp) { (void)fscanf(fp, "%lu", &freq_khz); fclose(fp); }
+        if (fp) { if (fscanf(fp, "%lu", &freq_khz) != 1) freq_khz = 0; fclose(fp); }
         cm->inst_mhz = freq_khz / 1000UL;
 
         if (cl->n_freq_states > 0) {
@@ -383,7 +385,7 @@ void cpu_print_cores_header(const cpu_metrics_t *m, int level)
         printf("  %-*s", w, buf);   /* 2-space gap from cpu-misc */
     } else {
         printf("  ");               /* 2-space gap from cpu-misc */
-        char lbl[8];
+        char lbl[16];
         for (int i = 0; i < m->n_total_cpus; i++) {
             snprintf(lbl, sizeof(lbl), "cpu%d", i);
             printf(" %4s", lbl);

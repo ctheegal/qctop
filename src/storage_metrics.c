@@ -43,8 +43,8 @@ static void partition_to_disk(const char *dev_path, char *dst, int dst_len)
         tmp[n] = '\0';
     }
 
-    strncpy(dst, tmp, dst_len - 1);
-    dst[dst_len - 1] = '\0';
+    if (strlen(tmp) >= (size_t)dst_len) return;
+    memcpy(dst, tmp, strlen(tmp) + 1);
 }
 
 /*
@@ -90,7 +90,8 @@ int storage_snapshot_begin(disk_raw_t snap[QCTOP_MAX_DISKS],
             continue;
         if (strcmp(name, root_disk) != 0) continue;
 
-        strncpy(names[0], name, 31);
+        if (strlen(name) >= 32) { fclose(fp); return 0; }
+        memcpy(names[0], name, strlen(name) + 1);
         snap[0].rd_sectors = rd_sect;
         snap[0].wr_sectors = wr_sect;
         fclose(fp);
@@ -127,7 +128,7 @@ static unsigned long read_storage_clk_mhz(void)
             free(path);
             if (!fp) continue;
             unsigned long long v = 0;
-            fscanf(fp, "%llu", &v);
+            if (fscanf(fp, "%llu", &v) != 1) v = 0;
             fclose(fp);
             unsigned long mhz = (v >= 1000000ULL) ? (unsigned long)(v / 1000000ULL)
                                                    : (unsigned long)v;
@@ -148,7 +149,7 @@ static unsigned long read_storage_clk_mhz(void)
         }
         if (!fp) continue;
         float gts = 0.0f;
-        fscanf(fp, "%f", &gts);
+        if (fscanf(fp, "%f", &gts) != 1) gts = 0.0f;
         fclose(fp);
         if (gts > 0.0f)
             return (unsigned long)(gts * 500.0f); /* GT/s × 500 ≈ effective MHz */
@@ -158,7 +159,7 @@ static unsigned long read_storage_clk_mhz(void)
     FILE *fp = fopen("/sys/class/mmc_host/mmc0/clock", "r");
     if (fp) {
         unsigned long long v = 0;
-        fscanf(fp, "%llu", &v);
+        if (fscanf(fp, "%llu", &v) != 1) v = 0;
         fclose(fp);
         if (v > 1000000ULL) return (unsigned long)(v / 1000000ULL);
     }

@@ -112,7 +112,7 @@ void thermal_init(thermal_metrics_t *m)
 
         thermal_zone_t *tz = &m->zones[idx];
         tz->zone_id = z;
-        (void)fgets(tz->type, sizeof(tz->type), fp);
+        if (!fgets(tz->type, sizeof(tz->type), fp)) { fclose(fp); continue; }
         fclose(fp);
 
         char *nl = strchr(tz->type, '\n');
@@ -154,7 +154,7 @@ void thermal_read(thermal_metrics_t *m)
         if (!fp) continue;
 
         int raw = 0;
-        (void)fscanf(fp, "%d", &raw);  /* (void) – warn_unused_result */
+        if (fscanf(fp, "%d", &raw) != 1) { fclose(fp); continue; }
         fclose(fp);
 
         float temp = (float)raw / 1000.0f;
@@ -230,7 +230,7 @@ static float read_zone_temp_by_id(int zone_id)
     FILE *fp = fopen(path, "r");
     if (!fp) return -1.0f;
     int raw = 0;
-    (void)fscanf(fp, "%d", &raw);  /* (void) – warn_unused_result */
+    if (fscanf(fp, "%d", &raw) != 1) { fclose(fp); return -1.0f; }
     fclose(fp);
     return (float)raw / 1000.0f;
 }
