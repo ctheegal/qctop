@@ -115,6 +115,13 @@ Subsystem filters (default: all subsystems):
 
 The binary is placed at `build/qctop`.
 
+Build output and compiler diagnostics are written to `build/build.log` and
+also streamed to the terminal. For a clean warning audit, force a rebuild with:
+
+```bash
+QCTOP_CLEAN_BUILD=1 ./scripts/build.sh
+```
+
 ### Cross-compile (from x86_64 host for aarch64 device)
 
 ```bash

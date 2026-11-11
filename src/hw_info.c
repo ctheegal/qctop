@@ -28,7 +28,7 @@ static unsigned long long read_ull(const char *path)
     FILE *fp = fopen(path, "r");
     if (!fp) return 0;
     unsigned long long v = 0;
-    fscanf(fp, "%llu", &v);
+    if (fscanf(fp, "%llu", &v) != 1) v = 0;
     fclose(fp);
     return v;
 }
@@ -132,8 +132,12 @@ static void print_cpu(void)
                  "/sys/devices/system/cpu/cpufreq/policy%d/related_cpus", pids[c]);
 
         int first_cpu = pids[c], last_cpu = pids[c], n_cpus = 0;
-        { FILE *fp = fopen(path, "r"); int x;
-          if (fp) { fscanf(fp, "%d", &first_cpu); fclose(fp); } }
+        { FILE *fp = fopen(path, "r");
+          if (fp) {
+              if (fscanf(fp, "%d", &first_cpu) != 1)
+                  first_cpu = pids[c];
+              fclose(fp);
+          } }
         { FILE *fp = fopen(path, "r"); int x;
           if (fp) { while (fscanf(fp, "%d", &x)==1){ n_cpus++; last_cpu=x; } fclose(fp); } }
 
@@ -266,9 +270,10 @@ static void print_memory(void)
                 const char *n = ent->d_name;
                 if (!strstr(n,"ddr") && !strstr(n,"mc")) continue;
                 if (strstr(n,"bw")) continue;
-                char path[256];
-                snprintf(path, sizeof(path),
-                         "/sys/class/devfreq/%s/available_frequencies", n);
+                char path[512];
+                int written = snprintf(path, sizeof(path),
+                                       "/sys/class/devfreq/%s/available_frequencies", n);
+                if (written < 0 || written >= (int)sizeof(path)) continue;
                 FILE *ff = fopen(path, "r");
                 if (!ff) continue;
                 unsigned long long v;
@@ -329,8 +334,9 @@ static void print_gpu(void)
         struct dirent *ent;
         while ((ent = readdir(dir)) != NULL) {
             if (!strstr(ent->d_name,"kgsl") && !strstr(ent->d_name,"gpu")) continue;
-            snprintf(path, sizeof(path),
-                     "/sys/class/devfreq/%s/available_frequencies", ent->d_name);
+            int written = snprintf(path, sizeof(path),
+                                   "/sys/class/devfreq/%s/available_frequencies", ent->d_name);
+            if (written < 0 || written >= (int)sizeof(path)) continue;
             FILE *ff = fopen(path, "r");
             if (!ff) continue;
             unsigned long long v;
@@ -364,8 +370,8 @@ static void print_storage(void)
     FILE *fp = fopen("/proc/partitions", "r");
     if (fp) {
         char line[256];
-        fgets(line, sizeof(line), fp); /* skip header */
-        fgets(line, sizeof(line), fp);
+        if (!fgets(line, sizeof(line), fp)) { fclose(fp); return; } /* skip header */
+        if (!fgets(line, sizeof(line), fp)) { fclose(fp); return; }
         while (fgets(line, sizeof(line), fp)) {
             unsigned maj, min; unsigned long long blks; char name[64];
             if (sscanf(line, "%u %u %llu %63s", &maj, &min, &blks, name) != 4) continue;
@@ -404,9 +410,12 @@ static void print_storage(void)
         while ((ent = readdir(dir)) != NULL) {
             const char *n = ent->d_name;
             if (!strstr(n,"ufs") && !strstr(n,"emmc") && !strstr(n,"mmc")) continue;
-            snprintf(path, sizeof(path),
-                     "/sys/class/devfreq/%s/available_frequencies", n);
-            FILE *ff = fopen(path, "r");
+            if (strlen(n) >= 218) continue;
+            char devfreq_path[256];
+            int written = snprintf(devfreq_path, sizeof(devfreq_path),
+                                   "/sys/class/devfreq/%s/available_frequencies", n);
+            if (written < 0 || written >= (int)sizeof(devfreq_path)) continue;
+            FILE *ff = fopen(devfreq_path, "r");
             if (!ff) continue;
             unsigned long long v;
             while (fscanf(ff, "%llu", &v) == 1) {

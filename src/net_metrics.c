@@ -37,7 +37,7 @@ static unsigned long long read_counter(const char *iface, const char *stat)
     free(path);
     if (!fp) return 0;
     unsigned long long v = 0;
-    fscanf(fp, "%llu", &v);
+    if (fscanf(fp, "%llu", &v) != 1) v = 0;
     fclose(fp);
     return v;
 }
@@ -56,7 +56,7 @@ static int iface_is_active(const char *name)
     free(path);
     if (fp) {
         char state[16] = {0};
-        fgets(state, sizeof(state), fp);
+        if (!fgets(state, sizeof(state), fp)) { fclose(fp); goto check_traffic; }
         fclose(fp);
         /* Accept "up" or "unknown" (some virtual/cellular ifaces stay unknown) */
         if (strncmp(state, "up",      2) == 0) return 1;
@@ -86,7 +86,8 @@ static int scan_ifaces(net_iface_snap_t out[NET_MAX_IFACES])
     while ((ent = readdir(dir)) != NULL &&
            n_cand < (int)(sizeof(candidates) / sizeof(candidates[0]))) {
         if (!iface_is_active(ent->d_name)) continue;
-        strncpy(candidates[n_cand], ent->d_name, 15);
+        if (strlen(ent->d_name) >= sizeof(candidates[n_cand])) continue;
+        memcpy(candidates[n_cand], ent->d_name, strlen(ent->d_name) + 1);
         n_cand++;
     }
     closedir(dir);
@@ -103,7 +104,7 @@ static int scan_ifaces(net_iface_snap_t out[NET_MAX_IFACES])
 
     int n = (n_cand < NET_MAX_IFACES) ? n_cand : NET_MAX_IFACES;
     for (int i = 0; i < n; i++) {
-        strncpy(out[i].name, candidates[i], 15);
+        memcpy(out[i].name, candidates[i], strlen(candidates[i]) + 1);
         out[i].rx_bytes = read_counter(candidates[i], "rx_bytes");
         out[i].tx_bytes = read_counter(candidates[i], "tx_bytes");
     }

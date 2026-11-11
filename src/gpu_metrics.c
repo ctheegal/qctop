@@ -14,7 +14,7 @@ static long read_long(const char *path)
     FILE *fp = fopen(path, "r");
     if (!fp) return -1;
     long v = -1;
-    fscanf(fp, "%ld", &v);
+    if (fscanf(fp, "%ld", &v) != 1) v = -1;
     fclose(fp);
     return v;
 }
@@ -38,7 +38,7 @@ static float read_gpu_temp(void)
         free(tp);
         if (!fp) continue;
         char type[48] = {0};
-        fgets(type, sizeof(type), fp);
+        if (!fgets(type, sizeof(type), fp)) { fclose(fp); continue; }
         fclose(fp);
 
         if (strncmp(type, "gpuss", 5) != 0) continue;
@@ -48,7 +48,7 @@ static float read_gpu_temp(void)
         free(tp);
         if (!fp) continue;
         int raw = 0;
-        fscanf(fp, "%d", &raw);
+        if (fscanf(fp, "%d", &raw) != 1) { fclose(fp); continue; }
         fclose(fp);
         float t = raw / 1000.0f;
         if (t > max_t) max_t = t;

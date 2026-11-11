@@ -26,19 +26,24 @@ static float nsp_max_temp(void)
         if (strncmp(ent->d_name, "thermal_zone", 12) != 0) continue;
 
         char path[96];
-        snprintf(path, sizeof(path),
-                 "/sys/class/thermal/%s/type", ent->d_name);
+        if (snprintf(path, sizeof(path),
+                     "/sys/class/thermal/%s/type", ent->d_name) >= (int)sizeof(path))
+            continue;
         FILE *fp = fopen(path, "r");
         if (!fp) continue;
         char type[32] = {0};
-        (void)fgets(type, sizeof(type), fp); fclose(fp);
+        if (!fgets(type, sizeof(type), fp)) { fclose(fp); continue; }
+        fclose(fp);
         if (strncmp(type, "nsp", 3) != 0) continue;
 
-        snprintf(path, sizeof(path),
-                 "/sys/class/thermal/%s/temp", ent->d_name);
+        if (snprintf(path, sizeof(path),
+                     "/sys/class/thermal/%s/temp", ent->d_name) >= (int)sizeof(path))
+            continue;
         fp = fopen(path, "r");
         if (!fp) continue;
-        int raw = 0; (void)fscanf(fp, "%d", &raw); fclose(fp);
+        int raw = 0;
+        if (fscanf(fp, "%d", &raw) != 1) { fclose(fp); continue; }
+        fclose(fp);
         float t = raw / 1000.0f;
         if (t > max_t) max_t = t;
     }
